@@ -1,3 +1,6 @@
+#! /usr/bin/env python3
+# coding: utf-8
+
 import cv2 
 import numpy as np
 import time
@@ -44,7 +47,7 @@ def local_mean(int_mean, img, h, w, i, j, v):
     if(i<=v/2 or j<=v/2 or i>=h-v/2 or j>=w-v/2):
         return img[i, j]
     else:
-        return ((int_mean[i+v/2, j+v/2] + int_mean[i-v/2, j-v/2] - int_mean[i-v/2, j+v/2] - int_mean[i+v/2, j-v/2])/float(v*v))
+        return ((int_mean[i+v//2][j+v//2] + int_mean[i-v//2][j-v//2] - int_mean[i-v//2][j+v//2] - int_mean[i+v//2][j-v//2])/float(v*v))
 
 def local_mean_array(img, h, w, v):
     int_mean = integer_mean(img, h, w)
@@ -59,10 +62,10 @@ def ecart_type_local_array(mean_array, img, h, w, v):
     #square_mean_array = np.multiply(mean_array, mean_array)
     #square_img = np.multiply(img, img)
     ones_v = np.ones([v,v])
-    for i in range(v/2, h-v/2):
-        for j in range(v/2, w-v/2):
-            array = img[i-v/2:i+v/2, j-v/2:j+v/2] - mean_array[i, j]*ones_v
-            var_array[i, j] = np.sqrt(np.sum(np.multiply(array, array)))/float(v*v)
+    for i in range(v//2, h-v//2):
+        for j in range(v//2, w-v//2):
+            array = img[i-v//2:i+v//2, j-v//2:j+v//2] - mean_array[i, j]*ones_v
+            var_array[i, j] = np.sqrt(np.sum(np.multiply(array, array)))/(v*v)
     return var_array
 
 def sauvola_binarise(img, h, w, v, k):
@@ -75,7 +78,7 @@ def sauvola_binarise(img, h, w, v, k):
 
 def Houghline(img, h, w, line_length):
     # Hough Line from open cv
-    lines = cv2.HoughLines(img.astype(np.uint8),2,np.pi/(180),line_length)
+    lines = cv2.HoughLines(img.astype(np.uint8),2,(np.pi)/(180),line_length)
     
     lignes_hor = []
     lignes_vert = []
@@ -710,9 +713,9 @@ def process(filename):
         grid = mask
         lignes_hor = []
         lignes_vert = []
-        lignes_vert, lignes_hor, number_of_lines_vert, number_of_lines_hor, grid = Houghline(mask, height, width, height/2)
+        lignes_vert, lignes_hor, number_of_lines_vert, number_of_lines_hor, grid = Houghline(mask, height, width, height//2)
         
-        cornerHarris_demo(grid, sudoku1, 200)
+        #cornerHarris_demo(grid, sudoku1, 200)
         """
         # Sort Hough lines
         pente_vert = []
