@@ -7,7 +7,7 @@ import time
 import matplotlib.pyplot as plt
 from operator import itemgetter
 import sys
-
+import logging as lg
 """
 filename = "/home/hugo/Sudoku/sudoku_original.jpg"
 filename2 = "/home/hugo/Sudoku/sudoku_photo.jpg"
@@ -125,10 +125,10 @@ def Houghline(img, h, w, line_length):
                 lignes_hor.append((i, pente, b, b))
                 number_of_lines_hor += 1
         cv2.line(void,(x1,y1),(x2,y2),0,2)
-    cv2.imshow("Grid", void)
+    #cv2.imshow("Grid", void)
     return lignes_vert, lignes_hor, number_of_lines_vert, number_of_lines_hor, void
 
-
+"""
 def clean_hough_lines_hor(img, lignes_hor, height, width):
     # Selection of lines
     lignes_hor = sorted(lignes_hor, key=itemgetter(2))
@@ -410,12 +410,16 @@ def clean_hough_lines_vert(img, lignes_vert, height, width):
         cv2.line(img, (int(-b_vert[i]/pente_vert[i]), 0), (int((width - b_vert[i])/pente_vert[i]), width), 0, 3)
     
     return (pente_vert, b_vert)
-    
-def compute_intersection(img, pente_hor, b_hor, pente_vert, b_vert, h, w):
+"""
+
+def compute_intersection(pente_hor, b_hor, pente_vert, b_vert, h, w):
     intersect = []
     new_intersect = []
     len_list_vert = len(pente_vert)
     len_list_hor = len(pente_hor)
+    void = 255*np.ones([h,w], dtype=np.uint8)
+
+    """
     if (len_list_hor==8 and len_list_vert == 8):
         len_list = len_list_hor
         for j in range(0, len_list):
@@ -440,16 +444,25 @@ def compute_intersection(img, pente_hor, b_hor, pente_vert, b_vert, h, w):
 
                 
     else:
-        for i in range(0, len_list_vert):
-            for j in range(0, len_list_hor):
-                x = -(b_vert[i]-b_hor[j])/float(pente_vert[i]-pente_hor[j])
-                y = pente_vert[i] * x + b_vert[i]
-                intersect.append((int(x), int(y)))
-                cv2.circle(img, (int(x), int(y)), 3, 0, 3)
+    """
+    for i in range(0, len_list_vert):
+        for j in range(0, len_list_hor):
+            x = -(b_vert[i]-b_hor[j])/float(pente_vert[i]-pente_hor[j])
+            y = pente_vert[i] * x + b_vert[i]
+            intersect.append((int(x), int(y)))
+            cv2.circle(void, (int(x), int(y)), 3, 0, 2)
+    
+    number_inters, labels_inters, stats_inters, centroid_inters = cv2.connectedComponentsWithStats(inverse_image(void))
+    area_labels = [e[cv2.CC_STAT_AREA] for e in stats_inters]
+    index_max_area = area_labels.index(max(area_labels))
 
-        for i in range(0,len_list_vert):
-            new_intersect.append(intersect[i*10:i*10+10])
-    return new_intersect
+    centroid_inters_list = list(centroid_inters//1)
+    del(centroid_inters_list[index_max_area])
+
+    intersection = []
+    for i in range(0,10):
+        intersection.append(sorted(centroid_inters_list[i*10:(i+1)*10], key=itemgetter(0)))
+    return intersection
 
 def detect_white_case(intersection, img, height, width):
     case_array = np.zeros([9,9], dtype=int)
@@ -460,7 +473,10 @@ def detect_white_case(intersection, img, height, width):
     crop_coord = []
     for i in range(0,9):
         for j in range(0,9):
-            cropped1 = crop_non_rect_case(img, np.array([intersection[i][j], intersection[i][j+1], intersection[i+1][j], intersection[i+1][j+1]]), height, width)
+            
+            #print(np.array([intersection[i][j], intersection[i][j+1], intersection[i+1][j], intersection[i+1][j+1]]))
+            cropped1 = crop_non_rect_case(img, np.array([intersection[i][j], intersection[i][j+1], intersection[i+1][j], intersection[i+1][j+1]]).reshape((-1,1,2)).astype(np.int32), height, width)
+            #cropped1 = crop_non_rect_case(img, np.array([intersection[i][j], intersection[i][j+1], intersection[i+1][j], intersection[i+1][j+1]]), height, width)
             
             # Connex component
             num_label, label_im, stats_label, centroid_label = cv2.connectedComponentsWithStats(cropped1)
@@ -475,33 +491,30 @@ def detect_white_case(intersection, img, height, width):
                 max_index = area.index(max(area))
                 [j_white_max, i_white_max] = find_color_max_label(label_im, max_index)
             
-            x1 = stats_label[max_index][cv2.CC_STAT_LEFT]
-            x2 = x1 + stats_label[max_index][cv2.CC_STAT_WIDTH]
-            y1 = stats_label[max_index][cv2.CC_STAT_TOP]
-            y2 = y1 + stats_label[max_index][cv2.CC_STAT_HEIGHT]
+            x1 = (stats_label[max_index][cv2.CC_STAT_LEFT])//1
+            x2 = (x1 + stats_label[max_index][cv2.CC_STAT_WIDTH])//1
+            y1 = (stats_label[max_index][cv2.CC_STAT_TOP])//1
+            y2 = (y1 + stats_label[max_index][cv2.CC_STAT_HEIGHT])//1
             
             cropped2 = cropped1[y1:y2, x1:x2]
-            
+            #cv2.imshow("crop"+str(i)+","+str(j),cropped2)
             intersect = intersection[i][j]
-            crop_coord.append((intersect[0]+x1, intersect[0]+x2, intersect[1]+y1, intersect[1]+y2))
-            mean_array[j,i] = np.mean(cropped2)
-            dev_array[j,i] = np.sqrt(np.var(cropped2))
+            crop_coord.append((int(intersect[0]+x1), int(intersect[0]+x2), int(intersect[1]+y1), int(intersect[1]+y2)))
+            mean_array[i,j] = np.mean(cropped2)
+            dev_array[i,j] = np.sqrt(np.var(cropped2))
     
     mean_case = np.mean(mean_array)
     mean_dev = np.sqrt(np.var(dev_array))
     
-    mean_array_sup = mean_array>=mean_case
-    mean_array_inf = mean_array<mean_case
-    
+    mean_array_inf = mean_array<=mean_case
     mean_dev_sup = dev_array>=mean_dev
-    mean_dev_inf = dev_array<mean_dev
 
-    case_array[mean_array_inf * mean_dev_sup == True] = 1
-
+    case_array[mean_array_inf* mean_dev_sup == True] = 1
+    print(case_array)
     return case_array, crop_coord
 
 def crop_non_rect_case(img, points, h, w):
-    mask = np.zeros([w,h], dtype=np.uint8)
+    mask = np.zeros([h,w], dtype=np.uint8)
     #method 1 smooth region
     cv2.drawContours(mask, [points], -1, 255, -1, cv2.LINE_AA)
  
@@ -583,38 +596,42 @@ def extract_and_resize_number(img, case_array, crop_coord, resize_dim):
                 x2 = crop_coord[9*i+j][1]
                 y1 = crop_coord[9*i+j][2]
                 y2 = crop_coord[9*i+j][3]
-                
+
                 case = img[y1:y2, x1:x2]
                 dim_case = np.shape(case)
                 h_case = dim_case[0]
                 w_case = dim_case[1]
 
-                number_case, labels_case, stats_case, centroid_case = cv2.connectedComponentsWithStats(inverse_image(case))
-                
-                area = [stats_case[k][4] for k in range(number_case)]
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
+                closing = cv2.morphologyEx(case, cv2.MORPH_CLOSE, kernel)
 
+                number_case, labels_case, stats_case, centroid_case = cv2.connectedComponentsWithStats(inverse_image(closing))
+
+                area = [stats_case[k][4] for k in range(number_case)]
                 max_index = area.index(max(area))
-        
                 [i_black_max,j_black_max] = find_color_max_label(labels_case, max_index)
                 
-                while(case[i_black_max,j_black_max] != 0):
-                    area[max_index]=0
-                    max_index = area.index(max(area))
-                    [i_black_max, j_black_max] = find_color_max_label(labels_case, max_index)
+                if (number_case>1):
+                    while(closing[i_black_max,j_black_max] != 0):
+                        area[max_index]=0
+                        max_index = area.index(max(area))
+                        [i_black_max, j_black_max] = find_color_max_label(labels_case, max_index)
                 
-                x_case1 = stats_case[max_index][0]
-                x_case2 = x_case1 + stats_case[max_index][2]
-                y_case1 = stats_case[max_index][1]
-                y_case2 = y_case1 + stats_case[max_index][3]
-
+                x_case1 = int(stats_case[max_index][0])
+                x_case2 = x_case1 + int(stats_case[max_index][2])
+                y_case1 = int(stats_case[max_index][1])
+                y_case2 = y_case1 + int(stats_case[max_index][3])
+                case_number = closing[y_case1:y_case2, x_case1:x_case2]
+                cv2.imshow("number"+str(i)+str(j), case_number)
                 if (h_case/4 < centroid_case[max_index][1] < (3*h_case)/4 and \
                     w_case/4 < centroid_case[max_index][0] < (3*w_case)/4):
-                    case_number = case[y_case1:y_case2, x_case1:x_case2]
+                    case_number = closing[y_case1:y_case2, x_case1:x_case2]
                     final_number = cv2.resize(case_number, resize_dim, interpolation=cv2.INTER_NEAREST)
                     if (np.mean(final_number)<230):
+                        cv2.imshow("number"+str(i)+str(j), final_number)
                         list_of_number.append([final_number, (i,j)])
+                
                     
-    
     return list_of_number
 
 
@@ -625,12 +642,10 @@ def find_color_max_label(label_im, max_index):
     h = dim[0]
     w = dim[1]
     while (label_im[i,j] != max_index or (j == w-1 and i == h-1)):
-        if (i == h-1):
-            i = 0
-            j=j+1
-            if (j==w-1):
-                return [i,j]
-        i=i+1
+        if (j == w-1):
+            j=0
+            i=i+1
+        j=j+1
     return [i,j]
     
 
@@ -643,7 +658,7 @@ def imshow_components(labels):
     blank_ch = 255*np.ones_like(label_hue)
     
     labeled_img = cv2.merge([label_hue, blank_ch, blank_ch])
-    cv2.imshow("blank", labeled_img)
+    #cv2.imshow("blank", labeled_img)
     # cvt to BGR for display
     #labeled_img = cv2.cvtColor(labeled_img, cv2.COLOR_HSV2BGR)
 
@@ -652,6 +667,10 @@ def imshow_components(labels):
     labeled_img[label_hue> 1] = 255
     kernel2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(10,10))
     closing = cv2.morphologyEx(labeled_img, cv2.MORPH_CLOSE, kernel2).astype(np.uint8)
+
+
+
+
 
 def process(filename):
     sudoku = cv2.imread(filename, 0)
@@ -684,18 +703,16 @@ def process(filename):
         ####### Binarisation using Sauvola's Method #######
         binarize = sauvola_binarise(sudoku1, height, width, 4, 0.05)
         #cv2.imshow('binarize',binarize)
-        #cv2.imwrite("sudoku_binarize.jpg", binarize)
         
         
         
         ####### Erosion #######
-
-
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
-        erosion = cv2.morphologyEx(inverse_image(binarize), cv2.MORPH_DILATE, kernel).astype(np.uint8)
-        cv2.imshow("erosion", erosion)
+        inverse_erosion = cv2.morphologyEx(inverse_image(binarize), cv2.MORPH_DILATE, kernel).astype(np.uint8)
+        erosion = inverse_image(inverse_erosion)
+        #cv2.imshow("erosion", erosion)
 
-        mask = clean_background(erosion, height, width).astype(np.uint8)
+        mask = clean_background(inverse_erosion, height, width).astype(np.uint8)
         #
         # res = cv2.bitwise_and(erosion, mask)
         #cv2.imshow("res", res)
@@ -715,7 +732,46 @@ def process(filename):
         lignes_vert = []
         lignes_vert, lignes_hor, number_of_lines_vert, number_of_lines_hor, grid = Houghline(mask, height, width, height//2)
         
+        pente_vert = [e[1] for e in lignes_vert]
+        b_vert = [e[2] for e in lignes_vert]
+        pente_hor = [e[1] for e in lignes_hor]
+        b_hor = [e[2] for e in lignes_hor]
+        
+        void = 255*np.ones([height,width], dtype=np.uint8)
+        intersection =[]
+        intersection = compute_intersection(pente_hor, b_hor, pente_vert, b_vert, height, width)
+
+        case_array = np.zeros([9,9], dtype=int)
+        crop_coord = []
+        
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(2,2))
+        inverse_erosion1 = cv2.morphologyEx(inverse_image(binarize), cv2.MORPH_DILATE, kernel).astype(np.uint8)
+        erosion1 = inverse_image(inverse_erosion1)
+        
+        case_array, crop_coord = detect_white_case(intersection, erosion, height, width)
+        cv2.imshow("bin", erosion1)
+        final_list_of_numbers = extract_and_resize_number(erosion1, case_array, crop_coord, (20,20))
+        #final_list_of_numbers = extract_and_resize_number(binarize.astype(np.uint8), case_array, crop_coord, (20,20))
+        print(len(final_list_of_numbers))
+        #cv2.imshow("number", final_list_of_numbers[1][0])
+        
+        
+        #
+        ####### Harris detection #######
+        """
+        dst = cv2.cornerHarris(inverse_image(mask),4,5,0.06)
+        #result is dilated for marking the corners, not important
+        #dst = cv2.dilate(dst,None)
+        
+        # Threshold for an optimal value, it may vary depending on the image.
+        void[dst>0.05*dst.max()]=0
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
+        close = cv2.morphologyEx(void, cv2.MORPH_CLOSE, kernel).astype(np.uint8)
+        cv2.imshow("close", close)
         #cornerHarris_demo(grid, sudoku1, 200)
+        """
+
         """
         # Sort Hough lines
         pente_vert = []
@@ -748,7 +804,7 @@ def process(filename):
         else:
             print("Not enough line detected")
         """
-        cv2.imshow("Hough", sudoku1)
+        cv2.imshow("original", sudoku1)
         
 
         
@@ -756,6 +812,7 @@ def process(filename):
         cv2.destroyAllWindows()
 
 def main():
+    lg.basicConfig(level=lg.DEBUG)
     process(str(sys.argv[1]))
 
 if __name__ == "__main__":
