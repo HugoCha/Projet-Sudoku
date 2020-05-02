@@ -627,7 +627,7 @@ def extract_and_resize_number(img, case_array, crop_coord, resize_dim):
                     w_case/4 < centroid_case[max_index][0] < (3*w_case)/4):
                     case_number = closing[y_case1:y_case2, x_case1:x_case2]
                     final_number = cv2.resize(case_number, resize_dim, interpolation=cv2.INTER_NEAREST)
-                    if (np.mean(final_number)<230):
+                    if (np.mean(final_number)<230 and final_number.shape[0] == 28 and final_number.shape[1] == 28):
                         cv2.imshow("number"+str(i)+str(j), final_number)
                         list_of_number.append([final_number, (i,j)])
                 
@@ -750,7 +750,7 @@ def process(filename):
         
         case_array, crop_coord = detect_white_case(intersection, erosion, height, width)
         cv2.imshow("bin", erosion1)
-        final_list_of_numbers = extract_and_resize_number(erosion1, case_array, crop_coord, (20,20))
+        final_list_of_numbers = extract_and_resize_number(erosion1, case_array, crop_coord, (28,28))
         #final_list_of_numbers = extract_and_resize_number(binarize.astype(np.uint8), case_array, crop_coord, (20,20))
         print(len(final_list_of_numbers))
         #cv2.imshow("number", final_list_of_numbers[1][0])
