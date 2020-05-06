@@ -22,6 +22,7 @@ class Sudoku_grid(object):
 
         self.zero = 0
         self.cases = []
+        self.complete_grid = np.zeros(np.shape(self.grid), dtype=int)
         self.blocks = Sudoku_blocks(self.grid)
         self.lines = Sudoku_lines(self.grid)
         self.cols = Sudoku_cols(self.grid)
@@ -35,7 +36,13 @@ class Sudoku_grid(object):
                 self.cases.append(Sudoku_case((i,j), self))
                 if (self.cases[-1].value == 0):
                     self.zero +=1
-            
+
+    def compute_zero(self, index, boolean):
+        if (boolean and self.grid[index] == 0):
+            self.zero += 1
+        if (not(boolean) and self.grid[index] == 0):
+            self.zero -= 1
+
     def get_ij(self, index):
         return (self.cases[9*index[0]+index[1]])
     
@@ -45,7 +52,7 @@ class Sudoku_grid(object):
         if (j!=0):
             return self.get_ij((i, j-1))
         elif (j==0):
-            return self.get_ij((i,j+1))
+            return self.get_ij((i,j))
     
     def get_up_case(self, case):
         i = case.X
@@ -53,8 +60,19 @@ class Sudoku_grid(object):
         if (i!=0):
             return self.get_ij((i-1, j))
         elif (i==0):
-            return self.get_ij((i+1,j))
+            return self.get_ij((i,j))
     
+    def get_up_right_case(self, case):
+        i = case.X
+        j = case.Y
+        if (i == 0 and (j-1)>=0 and ((j-1)//3 == j//3)):
+            return (self.get_left_case(case))
+        elif ((i==0 and j==0) or ((i == 0 and (j-1)>=0 or (i-1)//3 != i//3)) and ((j-1)//3 != j//3)):
+            return (case)
+        else:
+            return(self.get_ij((3*(i//3), 3*(j//3)+2)))
+            
+
     def get_temp_line(self, case):
         return (self.get_left_case(case).temp_line)
     
@@ -62,14 +80,50 @@ class Sudoku_grid(object):
         return (self.get_up_case(case).temp_col)
 
     def get_temp_block(self, case):
-        i = case.X
-        j = case.Y
-        if ((j-1)>0 and ((j-1)//3 == j//3)):
-            return (self.get_left_case(case).temp_block)
-        elif ((i-1)>0 and ((i-1)//3 == i//3)):
-            return (self.get_up_case(case).temp_block)
-        else:
-            return (case.temp_block)
+        return (self.get_up_right_case(case).temp_block)
+
+    def fill_grid(self):
+        for case in self.cases:
+            self.complete_grid[case.position] = case.temp_value
+        print("Grid to fill : ")
+        self.show()
+        print("Solution : ")
+        print(self.complete_grid)
+    
+    def solve_sudoku_backpropagation(self):
+        sudoku_grid = self
+        i = 0
+        j = 0
+        k=0
+        while((sudoku_grid.zero != 0 and (0<=i<=8 and 0<=j<=8)) ):
+            current_case = sudoku_grid.get_ij((i,j))
+            temp_line = sudoku_grid.get_temp_line(current_case)
+            temp_col = sudoku_grid.get_temp_col(current_case)
+            temp_block = sudoku_grid.get_temp_block(current_case)
+            """
+            print("temp line : ", temp_line.list_of_number)
+            print("temp col : ", temp_col.list_of_number)
+            print("temp block : ", temp_block.list_of_number, "\n")
+            """
+            #current_case.display_temp_info()
+
+            if (current_case.change_possible_value(temp_line, temp_col, temp_block) == True):
+                sudoku_grid.compute_zero((i,j), True)
+                if (j == 8):
+                    j=0
+                    i+=1
+                else:
+                    j+=1
+            else:
+                sudoku_grid.compute_zero((i,j), False)
+                if (j == 0):
+                    j=8
+                    i-=1
+                else:
+                    j-=1
+            k+=1
+            
+        sudoku_grid.fill_grid()
 
     def show(self):
         """
@@ -99,7 +153,7 @@ class Sudoku_block(object):
             print("Error in array block")
 
     def copy_block(self):
-        return Sudoku_block(self.block_array)
+        return Sudoku_block(copy.deepcopy(self.block_array))
 
 
     def check_value_in_block(self, value):
@@ -333,7 +387,7 @@ class Sudoku_col(object):
                 print("Error in array col")
     
     def copy_col(self):
-        return (Sudoku_col(self.col_array))
+        return (Sudoku_col(copy.deepcopy(self.col_array)))
             
     def check_value_in_col(self, value):
         if (value in self.list_of_number):
@@ -557,12 +611,12 @@ class Sudoku_case(object):
 
 
 
-def solve_sudoku(sudoku):
+def solve_sudoku_backpropagation(sudoku):
     sudoku_grid = Sudoku_grid(sudoku)
     i = 0
     j = 0
     k=0
-    while((sudoku_grid.zero != 0 and (0<=i<=8 and 0<=j<=8)) and k<100):
+    while((sudoku_grid.zero != 0 and (0<=i<=8 and 0<=j<=8)) ):
         current_case = sudoku_grid.get_ij((i,j))
         temp_line = sudoku_grid.get_temp_line(current_case)
         temp_col = sudoku_grid.get_temp_col(current_case)
@@ -575,25 +629,22 @@ def solve_sudoku(sudoku):
         #current_case.display_temp_info()
 
         if (current_case.change_possible_value(temp_line, temp_col, temp_block) == True):
-            sudoku_grid.zero -=1
-            if (j==2):
-                current_case.display_temp_info()
+            sudoku_grid.compute_zero((i,j), True)
             if (j == 8):
                 j=0
                 i+=1
             else:
                 j+=1
         else:
-            sudoku_grid.zero +=1
-            if (j==2):
-                current_case.display_temp_info()
+            sudoku_grid.compute_zero((i,j), False)
             if (j == 0):
                 j=8
                 i-=1
             else:
                 j-=1
         k+=1
-        #sudoku_grid.get_left_case(current_case).display_temp_info()
+        
+    sudoku_grid.fill_grid()
         
 
 puzzle = np.array(
@@ -606,6 +657,3 @@ puzzle = np.array(
     [0, 6, 0, 0, 0, 0, 2, 8, 0],
     [0, 0, 0, 4, 1, 9, 0, 0, 5],
     [0, 0, 0, 0, 8, 0, 0, 7, 9]])
-
-solve_sudoku(puzzle)
-#sudoku_grid.show()
