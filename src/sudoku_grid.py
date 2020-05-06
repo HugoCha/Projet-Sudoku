@@ -2,9 +2,10 @@
 # coding: utf-8
 
 import numpy as np
+import copy
 #import CNN_model
 
-class Sudoku_grid():
+class Sudoku_grid(object):
     """
     Class of complete grid
     """
@@ -15,7 +16,7 @@ class Sudoku_grid():
         dim = np.shape(array)
         if (dim!=()):
             if (dim[0]==9 and dim[1]==9):
-                self.grid = array/1
+                self.grid = array//1
         else:
             self.grid = np.zeros([9,9], dtype=int)
 
@@ -41,18 +42,18 @@ class Sudoku_grid():
     def get_left_case(self, case):
         i = case.X
         j = case.Y
-        if (i!=0):
-            self.get_ij((i-1, j))
-        elif (i==0):
-            self.get_ij((i,j))
+        if (j!=0):
+            return self.get_ij((i, j-1))
+        elif (j==0):
+            return self.get_ij((i,j+1))
     
     def get_up_case(self, case):
         i = case.X
         j = case.Y
-        if (j!=0):
-            self.get_ij((i, j-1))
-        elif (j==0):
-            self.get_ij((i,j))
+        if (i!=0):
+            return self.get_ij((i-1, j))
+        elif (i==0):
+            return self.get_ij((i+1,j))
     
     def get_temp_line(self, case):
         return (self.get_left_case(case).temp_line)
@@ -63,12 +64,12 @@ class Sudoku_grid():
     def get_temp_block(self, case):
         i = case.X
         j = case.Y
-        if ((i-1)>0 and ((i-1)//3 == i//3)):
+        if ((j-1)>0 and ((j-1)//3 == j//3)):
             return (self.get_left_case(case).temp_block)
-        elif ((j-1)>0 and ((j-1)//3 == j//3)):
+        elif ((i-1)>0 and ((i-1)//3 == i//3)):
             return (self.get_up_case(case).temp_block)
         else:
-            return (self.case.temp_block)
+            return (case.temp_block)
 
     def show(self):
         """
@@ -78,7 +79,7 @@ class Sudoku_grid():
 
 
 
-class Sudoku_block():
+class Sudoku_block(object):
     def __init__(self, array):
         dim = np.shape(array)
 
@@ -93,10 +94,14 @@ class Sudoku_block():
                         self.add_value_block(array[i,j])
                         self.remove_possibility(array[i,j])
                     else:
-                        print("Error in initial sudoku grid")
+                        print("Error in initial sudoku grid block")
         else:
             print("Error in array block")
-            
+
+    def copy_block(self):
+        return Sudoku_block(self.block_array)
+
+
     def check_value_in_block(self, value):
         if (value in self.list_of_number):
             return True
@@ -117,6 +122,12 @@ class Sudoku_block():
     def remove_value_block(self, value):
         self.list_of_number.remove(value)
     
+    def update_block(self, value, index):
+        if not(self.check_value_in_block(value)):
+            self.block_array[index]=value
+            self.add_value_block(value)
+            self.remove_possibility(value)
+
     def show_list(self):
         print(self.list_of_number)
     
@@ -124,7 +135,7 @@ class Sudoku_block():
         print(self.block_array)
 
 
-class Sudoku_blocks():
+class Sudoku_blocks(object):
     def __init__(self, array=None):
         if (array.shape!=()):
             self.block0 = Sudoku_block(array[0:3,0:3])
@@ -188,7 +199,7 @@ class Sudoku_blocks():
             print("\n")
         
 
-class Sudoku_line():
+class Sudoku_line(object):
     def __init__(self, array=None):
         dim = np.shape(array)
         self.list_of_number = []
@@ -202,10 +213,13 @@ class Sudoku_line():
                         self.add_value_line(array[0,j])
                         self.remove_possibility(array[0,j])
                     else:
-                        print("Error in initial sudoku grid")
+                        print("Error in initial sudoku grid line")
             else:
                 print("Error in array line")
-            
+    
+    def copy_line(self):
+        return Sudoku_line(copy.deepcopy(self.line_array))
+
     def check_value_in_line(self, value):
         if (value in self.list_of_number):
             return True
@@ -226,13 +240,19 @@ class Sudoku_line():
     def remove_value_line(self, value):
         self.list_of_number.remove(value)
     
+    def update_line(self, value, index):
+        if not(self.check_value_in_line(value)):
+            self.line_array[index]=value
+            self.add_value_line(value)
+            self.remove_possibility(value)
+    
     def show_list(self):
         print(self.list_of_number)
 
     def show(self):
         print(self.line_array)
 
-class Sudoku_lines():
+class Sudoku_lines(object):
     def __init__(self, array=None):
         if (array.shape!=()):
             self.line0 = Sudoku_line(array[0:1,0:9])
@@ -293,7 +313,7 @@ class Sudoku_lines():
             print("\n")
 
 
-class Sudoku_col():
+class Sudoku_col(object):
     def __init__(self, array=None):
         dim = np.shape(array)
 
@@ -308,9 +328,12 @@ class Sudoku_col():
                         self.add_value_col(array[j,0])
                         self.remove_possibility(array[j,0])
                     else:
-                        print("Error in initial sudoku grid")
+                        print("Error in initial sudoku grid col")
             else:
                 print("Error in array col")
+    
+    def copy_col(self):
+        return (Sudoku_col(self.col_array))
             
     def check_value_in_col(self, value):
         if (value in self.list_of_number):
@@ -332,13 +355,19 @@ class Sudoku_col():
     def remove_value_col(self, value):
         self.list_of_number.remove(value)
     
+    def update_col(self, value, index):
+        if not(self.check_value_in_col(value)):
+            self.add_value_col(value)
+            self.col_array[index] = value
+            self.remove_possibility(value)
+    
     def show_list(self):
         print(self.list_of_number)
 
     def show(self):
         print(self.col_array)
 
-class Sudoku_cols():
+class Sudoku_cols(object):
     def __init__(self, array=None):
         if (array.shape!=()):
             self.col0 = Sudoku_col(array[0:9,0:1])
@@ -397,23 +426,23 @@ class Sudoku_cols():
             self.switcher.get(i, "wrong number").show()
             print("\n")
 
-class Sudoku_case():
+class Sudoku_case(object):
     def __init__(self, index, sudoku_grid):
         self.position = index
-        self.line = sudoku_grid.lines.get_linei(index[0])
-        self.temp_line = self.line
+        self.line = sudoku_grid.lines.get_linei(index[0]).copy_line()
+        self.temp_line = sudoku_grid.lines.get_linei(index[0]).copy_line()
         
-        self.col = sudoku_grid.cols.get_coli(index[1])
-        self.temp_col = self.col
+        self.col =sudoku_grid.cols.get_coli(index[1]).copy_col() #Sudoku_col(.array)
+        self.temp_col = sudoku_grid.cols.get_coli(index[1]).copy_col() #Sudoku_col(sudoku_grid.cols.get_coli(index[1]).array)
 
-        self.block = sudoku_grid.blocks.get_blocki(index)
-        self.temp_block = self.block
+        self.block = sudoku_grid.blocks.get_blocki(index).copy_block()
+        self.temp_block = sudoku_grid.blocks.get_blocki(index).copy_block()
         
         self.value = sudoku_grid.grid[index]
         self.possible = self.compute_possible() if (self.value==0) else [self.value]
-        
+
         self.temp_value = self.possible[0]
-        self.temp_possible = self.possible
+        self.temp_possible = [0] + self.possible
 
          
 
@@ -427,45 +456,97 @@ class Sudoku_case():
     def remove_possibility(self, possible, value):
         possible.remove(value)
 
+    def del_index(self, i, liste):
+        if (liste != []):
+            del(liste[i])
+
     def reset_possible(self):
-        self.temp_possible = self.possible
-        self.temp_line = self.line
-        self.temp_col = self.col
-        self.temp_block = self.block
+        self.temp_possible = [0] + self.possible
+        self.temp_line = self.line.copy_line()
+        self.temp_col = self.col.copy_col()
+        self.temp_block = self.block.copy_block()
 
     def update_temp_value(self):
-        self.temp_value = self.temp_possible[0]
+        if (self.temp_possible != []):
+            self.temp_value = self.temp_possible[0]
 
     def update_temp_line(self, value):
-        self.temp_line.add_value_line(value)
+        if (value not in self.temp_line.list_of_number):
+            self.temp_line.update_line(value, (0, self.Y))
 
     def update_temp_col(self, value):
-        self.temp_col.add_value_col(value)
+        if (value not in self.temp_col.list_of_number):
+            self.temp_col.update_col(value, (self.X, 0))
     
     def update_temp_block(self ,value):
-        self.temp_block.add_value_block(value)
+        if (value not in self.temp_block.list_of_number):
+            self.temp_block.update_block(value, (self.X%3, self.Y%3))
 
     def update_possible(self, temp_line, temp_col, temp_block):
         new_temp_possible = []
         for i in self.temp_possible:
-            if ((i not in temp_line.list_of_number) and (i not in temp_col.list_of_number) and (i not in temp_block.list_of_number)):
+            if(self.value):
+                return self.temp_possible
+            elif ((i not in self.temp_line.list_of_number) and (i not in self.temp_col.list_of_number) and (i not in self.temp_block.list_of_number) and i!=0):
                 new_temp_possible.append(i)
         self.temp_possible = new_temp_possible
-        return self.temp_possible
-    
-    def change_possible_value(self):
-        if (self.temp_value == self.temp_possible[0]):
-            del(self.temp_possible[0])
-        if (self.temp_possible!=[]):
+
+    def test_void_possible(self):
+        if (self.temp_possible == []):
+            self.reset_possible()
+            #self.display_temp_info()
+            return False
+        return True
+
+    def test_if_possible(self, temp_line, temp_col, temp_block):
+        self.update_possible(temp_line, temp_col, temp_block)
+        if (self.position == (0,0) and self.value):
+            self.temp_possible = [self.value]
+        elif (self.temp_possible != []):
             self.update_temp_value()
             self.update_temp_line(self.temp_value)
             self.update_temp_col(self.temp_value)
             self.update_temp_block(self.temp_value)
-            return True
+        return self.test_void_possible()
+
+    def change_possible_value(self, temp_line, temp_col, temp_block):
+        self.del_index(0, self.temp_possible)
+        """
+        if(self.position == (0,0)):
+            return (self.test_if_possible(temp_line, temp_col, temp_block))
+        elif (self.X == 0):
+            self.temp_line = temp_line.copy_line()
+            self.temp_block = temp_block.copy_block()
+        elif (self.Y == 0):
+            self.temp_block = temp_block.copy_block()
+            self.temp_col = temp_col.copy_col()
         else:
-            self.reset_possible()
-            return False
-    
+        """
+        self.temp_line = temp_line.copy_line()
+        self.temp_block = temp_block.copy_block()
+        self.temp_col = temp_col.copy_col()
+        return (self.test_if_possible(temp_line, temp_col, temp_block))
+
+        
+        
+    def display_temp_info(self):
+        print("Index : ",self.position)
+        print("List of possible temp values : ", self.temp_possible)
+        print("Temp value : ", self.temp_value)
+        print("Temp line : ",self.temp_line.list_of_number)
+        print("Temp columns : ",self.temp_col.list_of_number)
+        print("Temp block : ",self.temp_block.list_of_number)
+        print("\n")
+
+    def display_fix_info(self):
+        print("Index : ", self.position)
+        print("List of possible values : ", self.possible)
+        print("Initial value : ", self.value)
+        print("Initial line : ",self.line.list_of_number)
+        print("Initial columns : ", self.col.list_of_number)
+        print("Initial block : ",self.block.list_of_number)
+        print("\n")
+
     @property
     def X(self):
         return self.position[0]
@@ -480,25 +561,40 @@ def solve_sudoku(sudoku):
     sudoku_grid = Sudoku_grid(sudoku)
     i = 0
     j = 0
-    while(sudoku_grid.zero != 0 or i>9 or j>9):
+    k=0
+    while((sudoku_grid.zero != 0 and (0<=i<=8 and 0<=j<=8)) and k<100):
         current_case = sudoku_grid.get_ij((i,j))
         temp_line = sudoku_grid.get_temp_line(current_case)
         temp_col = sudoku_grid.get_temp_col(current_case)
         temp_block = sudoku_grid.get_temp_block(current_case)
-        current_case.update_possible(temp_line, temp_col, temp_block)
-        if (current_case.change_possible_value() == True):
+        """
+        print("temp line : ", temp_line.list_of_number)
+        print("temp col : ", temp_col.list_of_number)
+        print("temp block : ", temp_block.list_of_number, "\n")
+        """
+        #current_case.display_temp_info()
+
+        if (current_case.change_possible_value(temp_line, temp_col, temp_block) == True):
             sudoku_grid.zero -=1
-            if (j == 9):
+            if (j==2):
+                current_case.display_temp_info()
+            if (j == 8):
                 j=0
                 i+=1
-            j+=1
+            else:
+                j+=1
         else:
             sudoku_grid.zero +=1
+            if (j==2):
+                current_case.display_temp_info()
             if (j == 0):
-                j=9
+                j=8
                 i-=1
-            j-=1
-            
+            else:
+                j-=1
+        k+=1
+        #sudoku_grid.get_left_case(current_case).display_temp_info()
+        
 
 puzzle = np.array(
     [[5, 3, 0, 0, 7, 0, 0, 0, 0],
