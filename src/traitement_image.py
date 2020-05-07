@@ -509,8 +509,9 @@ def detect_white_case(intersection, img, height, width):
     mean_array_inf = mean_array<=mean_case
     mean_dev_sup = dev_array>=mean_dev
 
-    case_array[mean_array_inf* mean_dev_sup == True] = 1
-    print(case_array)
+    #case_array[mean_array_inf* mean_dev_sup == True] = 1
+    case_array[mean_dev_sup+mean_array_inf == True] = 1
+
     return case_array, crop_coord
 
 def crop_non_rect_case(img, points, h, w):
@@ -622,18 +623,47 @@ def extract_and_resize_number(img, case_array, crop_coord, resize_dim):
                 y_case1 = int(stats_case[max_index][1])
                 y_case2 = y_case1 + int(stats_case[max_index][3])
                 case_number = closing[y_case1:y_case2, x_case1:x_case2]
-                cv2.imshow("number"+str(i)+str(j), case_number)
+                #cv2.imshow("number"+str(i)+str(j), case_number)
                 if (h_case/4 < centroid_case[max_index][1] < (3*h_case)/4 and \
                     w_case/4 < centroid_case[max_index][0] < (3*w_case)/4):
                     case_number = closing[y_case1:y_case2, x_case1:x_case2]
-                    final_number = cv2.resize(case_number, resize_dim, interpolation=cv2.INTER_NEAREST)
-                    if (np.mean(final_number)<230 and final_number.shape[0] == 28 and final_number.shape[1] == 28):
-                        cv2.imshow("number"+str(i)+str(j), final_number)
-                        list_of_number.append([final_number, (i,j)])
+                    #cv2.imshow("number"+str(i)+str(j), case_number)
+                    dim_case = np.shape(case_number)
+                    final_number = resize_final_crop(case_number, dim_case, 5, resize_dim)
+                    cv2.imshow(str(i)+str(j)+".jpg", final_number)
+                    if (np.mean(final_number)>10 and final_number.shape[0] == resize_dim[0] and final_number.shape[1] == resize_dim[1]):
+                        cv2.imshow(str(i)+str(j)+".jpg", final_number)
+                        list_of_number.append([(final_number).astype('float32')/255, (i,j)])
                 
                     
     return list_of_number
 
+def resize_final_crop(case_number, dim, padding, resize_dim):
+    parite0 = ((resize_dim[0]-dim[0])//2)%2
+    parite1 = ((resize_dim[1]-dim[1])//2)%2
+    if (dim[0]>=resize_dim[0]-2*padding and dim[1]>=dim[1]-2*padding):
+        case_number = cv2.resize(case_number, (resize_dim[0]-2*padding, resize_dim[1]-2*padding), interpolation=cv2.INTER_NEAREST)
+        borderType = cv2.BORDER_CONSTANT
+        final_number = cv2.copyMakeBorder(inverse_image(case_number), padding, padding, padding, padding, borderType)
+
+    elif (dim[0]<resize_dim[0]-2*padding and dim[1]>=dim[1]-2*padding):
+        case_number = cv2.resize(case_number, (dim[0], dim[1]-2*padding), interpolation=cv2.INTER_NEAREST)
+        borderType = cv2.BORDER_CONSTANT
+        final_number = cv2.copyMakeBorder(inverse_image(case_number), (resize_dim[0]-dim[0])//2, (resize_dim[0]-dim[0])//2+parite0, padding, padding, borderType)
+    
+    elif (dim[0]>=resize_dim[0]-2*padding and dim[1]<dim[1]-2*padding):
+        case_number = cv2.resize(case_number, (dim[0]-2*padding, dim[1]), interpolation=cv2.INTER_NEAREST)
+        borderType = cv2.BORDER_CONSTANT
+        final_number = cv2.copyMakeBorder(inverse_image(case_number), padding, padding,(resize_dim[1]-dim[1])//2, (resize_dim[1]-dim[1])//2+parite1, borderType)
+    
+    elif (dim[0]<5 or dim[1]<5):
+        pass
+
+    else:
+        borderType = cv2.BORDER_CONSTANT
+        final_number = cv2.copyMakeBorder(inverse_image(case_number), (resize_dim[0]-dim[0])//2, (resize_dim[0]-dim[0])//2+parite0,(resize_dim[1]-dim[1])//2, (resize_dim[1]-dim[1])//2+parite1, borderType)
+
+    return final_number
 
 def find_color_max_label(label_im, max_index):
     i = 0
@@ -672,7 +702,7 @@ def imshow_components(labels):
 
 
 
-def process(filename):
+def image_process(filename):
     sudoku = cv2.imread(filename, 0)
 
     ######## Test if img is void ##########
@@ -713,9 +743,9 @@ def process(filename):
         #cv2.imshow("erosion", erosion)
 
         mask = clean_background(inverse_erosion, height, width).astype(np.uint8)
-        #
         # res = cv2.bitwise_and(erosion, mask)
         #cv2.imshow("res", res)
+        
         ####### Closing #######
         """
         kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
@@ -749,71 +779,20 @@ def process(filename):
         erosion1 = inverse_image(inverse_erosion1)
         
         case_array, crop_coord = detect_white_case(intersection, erosion, height, width)
-        cv2.imshow("bin", erosion1)
+        #cv2.imshow("bin", erosion1)
         final_list_of_numbers = extract_and_resize_number(erosion1, case_array, crop_coord, (28,28))
-        #final_list_of_numbers = extract_and_resize_number(binarize.astype(np.uint8), case_array, crop_coord, (20,20))
         print(len(final_list_of_numbers))
-        #cv2.imshow("number", final_list_of_numbers[1][0])
         
-        
-        #
-        ####### Harris detection #######
-        """
-        dst = cv2.cornerHarris(inverse_image(mask),4,5,0.06)
-        #result is dilated for marking the corners, not important
-        #dst = cv2.dilate(dst,None)
-        
-        # Threshold for an optimal value, it may vary depending on the image.
-        void[dst>0.05*dst.max()]=0
-
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
-        close = cv2.morphologyEx(void, cv2.MORPH_CLOSE, kernel).astype(np.uint8)
-        cv2.imshow("close", close)
-        #cornerHarris_demo(grid, sudoku1, 200)
-        """
-
-        """
-        # Sort Hough lines
-        pente_vert = []
-        b_vert = []
-        pente_hor = []
-        b_hor = []
-        
-        if (number_of_lines_hor>=8 and number_of_lines_vert>=8):
-            pente_hor, b_hor = clean_hough_lines_hor(sudoku1, lignes_hor, height, width)
-            pente_vert, b_vert = clean_hough_lines_vert(sudoku1, lignes_vert, height, width)
-        
-            # Compute intersection for cropping
-            intersection = []
-            intersection = compute_intersection(sudoku1, pente_hor, b_hor, pente_vert, b_vert, height, width)
-            
-            if (len(intersection) >= 8):
-                # Detect white case and isolate cases with number
-                case_array = np.zeros([9,9], dtype=int)
-                crop_coord = []
-                case_array, crop_coord = detect_white_case(intersection, erosion, height, width)
-                #img = erosions
-                
-                final_list_of_numbers = extract_and_resize_number(erosion, case_array, crop_coord, (20,20))
-
-                print(len(final_list_of_numbers))
-                cv2.imshow("number", final_list_of_numbers[10][0])
-            else:
-                print("Not enough intersections detected")
-            
-        else:
-            print("Not enough line detected")
-        """
         cv2.imshow("original", sudoku1)
-        
-
-        
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+        
+        
+        return final_list_of_numbers
 
 def main():
     lg.basicConfig(level=lg.DEBUG)
-    process(str(sys.argv[1]))
+    image_process(str(sys.argv[1]))
 
 if __name__ == "__main__":
     main()
