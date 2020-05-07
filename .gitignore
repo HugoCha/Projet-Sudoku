@@ -1,4 +1,6 @@
 #ignore virtual env
 env/
+#ignore set of train images
+train_set/
 #ignore pdf
 .pdf
