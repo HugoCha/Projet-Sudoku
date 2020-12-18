@@ -1,5 +1,4 @@
-# Projet-Sudoku
+# Sudoku Project
 
 
-L'objectif de ce projet est de créer une application qui permet de détecter une grille de Sudoku et de a résoudre.
-De plus, dans un second temps, générer des grilles de Sudoku
+The aim was to create a programm capable of resolving a Sudoku from a photo of a Sudoku Grid. For now, the project is stucked while detecting numbers (there are already cleaned and isolated) because the neural nets doesn't detect ones, fours and sixes.
