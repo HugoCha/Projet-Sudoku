@@ -1,0 +1,32 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "",
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "includePath": [
+        "/home/hugo/ws_move_it/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_planners/chomp/chomp_motion_planner/include/**",
+        "/home/hugo/ws_move_it/src/fcl/include/**",
+        "/home/hugo/ws_move_it/src/geometric_shapes/include/**",
+        "/home/hugo/catkin_ws/src/kuka_kinematics/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_planners/chomp/chomp_interface/include/**",
+        "/home/hugo/ws_move_it/src/moveit_resources/prbt_ikfast_manipulator_plugin/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_ros/benchmarks/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_plugins/moveit_ros_control_interface/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_ros/move_group/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_ros/occupancy_map_monitor/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_ros/robot_interaction/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_ros/moveit_servo/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_setup_assistant/include/**",
+        "/home/hugo/ws_move_it/src/moveit/moveit_plugins/moveit_simple_controller_manager/include/**",
+        "/home/hugo/ws_move_it/src/moveit_visual_tools/include/**",
+        "/home/hugo/ws_move_it/src/rviz_visual_tools/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS"
+    }
+  ]
+}
