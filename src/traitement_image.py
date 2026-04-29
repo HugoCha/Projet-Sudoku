@@ -469,15 +469,17 @@ def detect_white_case(intersection, img, height, width):
     mean_array = np.zeros([9,9])
     dev_array = np.zeros([9,9])
 
+    if ( len( intersection ) < 10 ):
+        raise Exception( "Line Intersection size mismatch" )
 
     crop_coord = []
     for i in range(0,9):
         for j in range(0,9):
+            if ( len( intersection[i] ) < 10 or len( intersection[i+1] ) < 10 ):
+                raise Exception( f"Line j Intersection size mismatch" )
             
-            #print(np.array([intersection[i][j], intersection[i][j+1], intersection[i+1][j], intersection[i+1][j+1]]))
             cropped1 = crop_non_rect_case(img, np.array([intersection[i][j], intersection[i][j+1], intersection[i+1][j], intersection[i+1][j+1]]).reshape((-1,1,2)).astype(np.int32), height, width)
-            #cropped1 = crop_non_rect_case(img, np.array([intersection[i][j], intersection[i][j+1], intersection[i+1][j], intersection[i+1][j+1]]), height, width)
-            
+
             # Connex component
             num_label, label_im, stats_label, centroid_label = cv2.connectedComponentsWithStats(cropped1)
 
@@ -629,39 +631,51 @@ def extract_and_resize_number(img, case_array, crop_coord, resize_dim):
                     case_number = closing[y_case1:y_case2, x_case1:x_case2]
                     #cv2.imshow("number"+str(i)+str(j), case_number)
                     dim_case = np.shape(case_number)
-                    final_number = resize_final_crop(case_number, dim_case, 5, resize_dim)
-                    cv2.imshow(str(i)+str(j)+".jpg", final_number)
+                    final_number = resize_final_crop(case_number, 5, resize_dim)
+                    #cv2.imshow(str(i)+str(j)+".jpg", final_number)
                     if (np.mean(final_number)>10 and final_number.shape[0] == resize_dim[0] and final_number.shape[1] == resize_dim[1]):
-                        cv2.imshow(str(i)+str(j)+".jpg", final_number)
+                        #cv2.imshow(str(i)+str(j)+".jpg", final_number)
                         list_of_number.append([(final_number).astype('float32')/255, (i,j)])
-                
                     
     return list_of_number
 
-def resize_final_crop(case_number, dim, padding, resize_dim):
-    parite0 = ((resize_dim[0]-dim[0])//2)%2
-    parite1 = ((resize_dim[1]-dim[1])//2)%2
-    if (dim[0]>=resize_dim[0]-2*padding and dim[1]>=dim[1]-2*padding):
-        case_number = cv2.resize(case_number, (resize_dim[0]-2*padding, resize_dim[1]-2*padding), interpolation=cv2.INTER_NEAREST)
-        borderType = cv2.BORDER_CONSTANT
-        final_number = cv2.copyMakeBorder(inverse_image(case_number), padding, padding, padding, padding, borderType)
+def resize_final_crop(case_number, padding, resize_dim):
+    target_h = resize_dim[0] - 2 * padding
+    target_w = resize_dim[1] - 2 * padding
 
-    elif (dim[0]<resize_dim[0]-2*padding and dim[1]>=dim[1]-2*padding):
-        case_number = cv2.resize(case_number, (dim[0], dim[1]-2*padding), interpolation=cv2.INTER_NEAREST)
-        borderType = cv2.BORDER_CONSTANT
-        final_number = cv2.copyMakeBorder(inverse_image(case_number), (resize_dim[0]-dim[0])//2, (resize_dim[0]-dim[0])//2+parite0, padding, padding, borderType)
-    
-    elif (dim[0]>=resize_dim[0]-2*padding and dim[1]<dim[1]-2*padding):
-        case_number = cv2.resize(case_number, (dim[0]-2*padding, dim[1]), interpolation=cv2.INTER_NEAREST)
-        borderType = cv2.BORDER_CONSTANT
-        final_number = cv2.copyMakeBorder(inverse_image(case_number), padding, padding,(resize_dim[1]-dim[1])//2, (resize_dim[1]-dim[1])//2+parite1, borderType)
-    
-    elif (dim[0]<5 or dim[1]<5):
-        pass
+    h, w = case_number.shape[:2]
 
-    else:
-        borderType = cv2.BORDER_CONSTANT
-        final_number = cv2.copyMakeBorder(inverse_image(case_number), (resize_dim[0]-dim[0])//2, (resize_dim[0]-dim[0])//2+parite0,(resize_dim[1]-dim[1])//2, (resize_dim[1]-dim[1])//2+parite1, borderType)
+    if h < 5 or w < 5:
+        return None
+
+    scale = min(target_h / h, target_w / w)
+
+    new_h = int(h * scale)
+    new_w = int(w * scale)
+
+    resized = cv2.resize(
+        case_number,
+        (new_w, new_h),
+        interpolation=cv2.INTER_NEAREST
+    )
+
+    resized = inverse_image(resized)
+
+    top = (resize_dim[0] - new_h) // 2
+    bottom = resize_dim[0] - new_h - top
+
+    left = (resize_dim[1] - new_w) // 2
+    right = resize_dim[1] - new_w - left
+
+    final_number = cv2.copyMakeBorder(
+        resized,
+        top,
+        bottom,
+        left,
+        right,
+        borderType=cv2.BORDER_CONSTANT,
+        value=0
+    )
 
     return final_number
 
@@ -677,7 +691,6 @@ def find_color_max_label(label_im, max_index):
             i=i+1
         j=j+1
     return [i,j]
-    
 
 def imshow_components(labels):
     # Map component labels to hue val
@@ -697,10 +710,6 @@ def imshow_components(labels):
     labeled_img[label_hue> 1] = 255
     kernel2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(10,10))
     closing = cv2.morphologyEx(labeled_img, cv2.MORPH_CLOSE, kernel2).astype(np.uint8)
-
-
-
-
 
 def image_process(filename):
     sudoku = cv2.imread(filename, 0)
@@ -792,7 +801,11 @@ def image_process(filename):
 
 def main():
     lg.basicConfig(level=lg.DEBUG)
-    image_process(str(sys.argv[1]))
+    try:
+        image_process(str(sys.argv[1]))
+    except Exception as e:
+        print( f"Error:{e}" )
+        print( "Unable to extract sudoku cases" )
 
 if __name__ == "__main__":
     main()
