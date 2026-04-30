@@ -6,7 +6,7 @@ import os
 import cv2
 
 from keras.datasets import mnist
-from keras.utils import np_utils
+from keras.utils import to_categorical
 
 
 from keras.models import model_from_json
@@ -15,8 +15,8 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import Dropout
 from keras.layers import Flatten
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import MaxPooling2D
+from keras.layers import Conv2D
+from keras.layers import MaxPooling2D
 
 from keras import backend as K
 
@@ -45,7 +45,7 @@ def extract_image_to_train(filename):
 def get_and_prepare_data_mnist():
     # load data
     (X_train, y_train), (X_test, y_test) = mnist.load_data()
-    (X_train_bonus, y_train_bonus) = extract_image_to_train("/home/hugo/Sudoku/Projet-Sudoku/train_set/")
+    (X_train_bonus, y_train_bonus) = extract_image_to_train("train_set/")
     # Reshape X_train originally 60000x28x28 -> 60000x1x28x28
     # type float32 because pixels are normalized (/255)
     X_train = np.concatenate((X_train, X_train_bonus))
@@ -61,8 +61,8 @@ def get_and_prepare_data_mnist():
     # one hot encode outputs
     # before y_train = label of number to detect ex: 3
     # after y_train = [0 0 0 1. 0 0 0 0 0 0]
-    y_train = np_utils.to_categorical(y_train)
-    y_test = np_utils.to_categorical(y_test)
+    y_train = to_categorical(y_train)
+    y_test = to_categorical(y_test)
     num_classes = y_test.shape[1]
 
     return (X_train, y_train), (X_test, y_test), num_classes
@@ -121,7 +121,7 @@ def train_and_save_model(filename, train_set, test_set, num_classes):
     model = model_CNN(num_classes)
     model.fit(X_train, y_train, validation_data=(X_test, y_test) ,batch_size=200, epochs=12)
     print_model_error_rate(model, X_test, y_test)
-    save_keras_model(model, "model_detec_chiffre")
+    save_keras_model(model, "src/model_detec_chiffre")
 
 #(X_train, y_train), (X_test, y_test), num_classes = get_and_prepare_data_mnist()
 #train_and_save_model("model_detec_chiffre", (X_train, y_train), (X_test, y_test), num_classes)
