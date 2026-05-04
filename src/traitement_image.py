@@ -2,16 +2,17 @@
 # coding: utf-8
 
 import cv2 
+from cv2.typing import MatLike
 import numpy as np
 import time
 import matplotlib.pyplot as plt
 from operator import itemgetter
 import sys
 import logging as lg
-"""
-filename = "/home/hugo/Sudoku/sudoku_original.jpg"
-filename2 = "/home/hugo/Sudoku/sudoku_photo.jpg"
-"""
+from typing import Tuple, Set, List
+
+from .visualization import *
+from .config import *
 
 def normalize_image(img, h, w, alpha, beta):
     #Set the range of pixel values between alpha and beta
@@ -464,6 +465,16 @@ def compute_intersection(pente_hor, b_hor, pente_vert, b_vert, h, w):
         intersection.append(sorted(centroid_inters_list[i*10:(i+1)*10], key=itemgetter(0)))
     return intersection
 
+def draw_intersection( img:MatLike, intersections ) -> MatLike:
+    output = img.copy()
+    for i in range( len( intersections ) ):
+        for j in range( len( intersections[i] ) ):
+            #print(intersections[i][j])
+            x = int( intersections[i][j][0] )
+            y = int( intersections[i][j][1] )
+            cv2.circle(output, (x,y), 3, (100,50,255), 2)
+    return output
+
 def detect_white_case(intersection, img, height, width):
     case_array = np.zeros([9,9], dtype=int)
     mean_array = np.zeros([9,9])
@@ -589,6 +600,108 @@ def clean_background(img, h, w):
     #cv2.imshow("clean bg", closing2)
     return closing2
 
+def min_area_rect( img:MatLike, mask:MatLike ) -> MatLike:
+        
+        def is_valid_contour( contour ):
+            area = cv2.contourArea(contour)
+
+            if area < 500 or area > 15000:
+                return False
+
+            hull = cv2.convexHull(contour)
+            hull_area = cv2.contourArea(hull)
+
+            if hull_area == 0:
+                return False
+
+            solidity = float(area) / hull_area
+
+            if solidity < 0.6:
+                return False
+
+            return True
+        
+        def draw_bounding_box( img, cnt, color ):
+            hull = cv2.convexHull(cnt)
+
+            rect = cv2.minAreaRect(hull)
+            box = cv2.boxPoints(rect)
+            box = box.astype(np.int32).reshape(4, 1, 2)
+
+            cv2.drawContours(
+                img,
+                [hull],
+                -1,
+                (0, 255, 0),
+                2
+            )
+
+            cv2.drawContours(
+                img,
+                [box],
+                0,
+                color,
+                4
+            )
+        
+        def unrotate_crop( img, cnt ):
+            hull = cv2.convexHull(cnt)
+
+            rect = cv2.minAreaRect(hull)
+            box = cv2.boxPoints(rect)
+            box = box.astype(np.int32).reshape(4, 2)
+
+            # Get the angle of rotation
+            angle = rect[2]
+
+            # Rotate the image to align the rectangle with the axes
+            if angle < -45:
+                angle += 90  # Adjust angle to avoid flipping
+
+            # Compute the rotation matrix
+            rows, cols = img.shape[:2]
+            M = cv2.getRotationMatrix2D(rect[0], angle, 1)
+
+            # Rotate the image
+            rotated_image = cv2.warpAffine(img, M, (cols, rows))
+
+            # Crop the rotated image using the bounding box
+            x, y, w, h = cv2.boundingRect(box)
+            return rotated_image[y:y+h, x:x+w]
+
+        def extract_bounding_box_image( img, cnt ):
+            hull = cv2.convexHull(cnt)
+
+            rect = cv2.minAreaRect(hull)
+            box = cv2.boxPoints(rect)
+            #box = box.astype(np.int32).reshape(4, 2)
+            width = int(max(np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[2] - box[3])))
+            height = int(max(np.linalg.norm(box[0] - box[3]), np.linalg.norm(box[1] - box[2])))
+
+            dst_points = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
+
+            M = cv2.getPerspectiveTransform(box, dst_points)
+            sub_image = cv2.warpPerspective(img, M, (width, height))
+
+            return sub_image
+
+        output = img.copy()
+        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = sorted( contours, key=lambda cnt : cv2.contourArea( cnt ), reverse=True )
+
+        if ( len( contours ) >= 0 ):
+            output = unrotate_crop( output, contours[0] )
+            #output = extract_bounding_box_image( output, contours[0] )
+            #draw_bounding_box( output, contours[0], (0, 0, 255) )
+
+        # for cnt in contours[1:]:
+        #     if not is_valid_contour(cnt):
+        #         continue
+
+        #     draw_bounding_box( output, cnt, (255, 255, 0) )
+
+        return output
+
 def extract_and_resize_number(img, case_array, crop_coord, resize_dim):
     list_of_number = []
     final_number = np.zeros(resize_dim, dtype=np.uint8)
@@ -712,59 +825,66 @@ def imshow_components(labels):
     closing = cv2.morphologyEx(labeled_img, cv2.MORPH_CLOSE, kernel2).astype(np.uint8)
 
 def image_process(filename):
-    sudoku = cv2.imread(filename, 0)
+    final_list_of_numbers = []
+    sudoku = cv2.imread(filename)
+    show_image_match(( "original", sudoku ), img_to_display)
 
     ######## Test if img is void ##########
-    if np.shape(sudoku) == ():
+    if sudoku is None or np.shape(sudoku) == ():
         print ("Pas d'image detectee!!")
     else:
         dim = np.shape(sudoku)
-        height = dim[0] if (dim[0]<=480) else 480 
-        width  = dim[1] if (dim[1]<=640) else 640 
+        height = 480#dim[0] if (dim[0]<=480) else 480 
+        width  = 640#dim[1] if (dim[1]<=640) else 640 
         dim = (width, height)
-        
 
         ####### Resize img #########
-        sudoku1 = cv2.resize(sudoku, dim, interpolation = cv2.INTER_LINEAR)
+        resize = cv2.resize(sudoku, dim, interpolation = cv2.INTER_LINEAR)
         #else:
         #    sudoku1 = np.copy(sudoku)
-
+        show_image_match(( "resize", resize ), img_to_display)
         
+        ####### Gray img ######
+        gray = cv2.cvtColor( resize, cv2.COLOR_BGR2GRAY )
+        show_image_match(( "gray", gray ), img_to_display)
+
         ####### Normalize Histogramm #######
-        sudoku2 = normalize_image(sudoku1, height, width, 40, 200).astype(np.uint8)
+        sudoku2 = normalize_image(gray, height, width, 40, 200).astype(np.uint8)
+        show_image_match(( "normalize_image", sudoku2 ), img_to_display)
         #res = np.hstack((sudoku1,sudoku2)) 
-        #cv2.imshow('norm_histo',sudoku2)
         
         ####### Balance Histogramm #######
         sudoku3 = cv2.equalizeHist(sudoku2)
-        #cv2.imshow('eq_histo',sudoku3)
+        show_image_match(( "equalize_histogram", sudoku3 ), img_to_display)
 
         ####### Binarisation using Sauvola's Method #######
-        binarize = sauvola_binarise(sudoku1, height, width, 4, 0.05)
-        #cv2.imshow('binarize',binarize)
-        
-        
+        binarize = sauvola_binarise(gray, height, width, 4, 0.05)
+        show_image_match(( "sauvola_binarise", binarize ), img_to_display)
         
         ####### Erosion #######
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
         inverse_erosion = cv2.morphologyEx(inverse_image(binarize), cv2.MORPH_DILATE, kernel).astype(np.uint8)
         erosion = inverse_image(inverse_erosion)
-        #cv2.imshow("erosion", erosion)
+        show_image_match(( "erosion0", erosion ), img_to_display)
 
+        ####### Remove background #######
         mask = clean_background(inverse_erosion, height, width).astype(np.uint8)
+        show_image_match(( "clean_background", mask ), img_to_display)
         # res = cv2.bitwise_and(erosion, mask)
-        #cv2.imshow("res", res)
         
-        ####### Closing #######
+        ####### Get Min bounding box #######
+        bounding_box = min_area_rect( resize, mask )
+        show_image_match(( "bounding_box", bounding_box ), img_to_display)
+
         """
-        kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
-        closing = cv2.morphologyEx(erosion, cv2.MORPH_CLOSE, kernel2).astype(np.uint8)
-        cv2.imshow("closing", closing)
+        ####### Closing #######
+        #kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
+        #closing = cv2.morphologyEx(erosion, cv2.MORPH_CLOSE, kernel2).astype(np.uint8)
+        #cv2.imshow("closing", closing)
 
         ####### Laplacian #######
-        Laplacian = cv2.Laplacian(inverse_image(res),cv2.CV_8U,ksize=3)
+        #Laplacian = cv2.Laplacian(inverse_image(res),cv2.CV_8U,ksize=3)
         #cv2.imshow("Laplacian", Laplacian)
-        """
         ####### Hough Line #######
         grid = mask
         lignes_hor = []
@@ -779,6 +899,8 @@ def image_process(filename):
         void = 255*np.ones([height,width], dtype=np.uint8)
         intersection =[]
         intersection = compute_intersection(pente_hor, b_hor, pente_vert, b_vert, height, width)
+        intersection_img = draw_intersection( resize, intersection )
+        show_image_match( ("intersection",intersection_img), img_to_display )
 
         case_array = np.zeros([9,9], dtype=int)
         crop_coord = []
@@ -786,26 +908,31 @@ def image_process(filename):
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(2,2))
         inverse_erosion1 = cv2.morphologyEx(inverse_image(binarize), cv2.MORPH_DILATE, kernel).astype(np.uint8)
         erosion1 = inverse_image(inverse_erosion1)
-        
+        show_image_match( ("erosion1",erosion1), img_to_display )
+
         case_array, crop_coord = detect_white_case(intersection, erosion, height, width)
         #cv2.imshow("bin", erosion1)
         final_list_of_numbers = extract_and_resize_number(erosion1, case_array, crop_coord, (28,28))
-        print(len(final_list_of_numbers))
-        
-        cv2.imshow("original", sudoku1)
-        cv2.waitKey(0)
+        print(len(final_list_of_numbers))        
+        """
+
         cv2.destroyAllWindows()
-        
-        
+
         return final_list_of_numbers
 
 def main():
     lg.basicConfig(level=lg.DEBUG)
-    try:
-        image_process(str(sys.argv[1]))
-    except Exception as e:
-        print( f"Error:{e}" )
-        print( "Unable to extract sudoku cases" )
+    #try:
+    if ( len( sys.argv ) <= 1 ):
+        for fpath in filepathes:
+            image_process( fpath )
+    else:
+        arg1 = sys.argv[1]
+        fpath = str( arg1 )
+        image_process( fpath )
+    # except Exception as e:
+    #     print( f"Error:{e}" )
+    #     print( "Unable to extract sudoku cases" )
 
 if __name__ == "__main__":
     main()

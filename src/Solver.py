@@ -1,6 +1,8 @@
 #! /usr/bin/env python3
 # coding: utf-8
 
+import cv2
+
 from CNN_model import load_keras_model
 import traitement_image as TI
 from sudoku_grid import Sudoku_grid
@@ -28,6 +30,7 @@ def final_process(filename) -> np.array:
 def main():
     sudoku_array = final_process(str(sys.argv[1]))
     sudoku_grid = Sudoku_grid( sudoku_array )
+    print(sudoku_array)
     sudoku_grid.solve_sudoku_backpropagation()
 
 
